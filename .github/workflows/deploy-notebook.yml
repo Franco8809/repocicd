@@ -16,9 +16,9 @@ jobs:
     - name: Export multiple notebooks (raw)
       run: |
         ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
-        ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
         NOTEBOOK_BASE="/Workspace/Users/danielacartagena1995@gmail.com/repocicd/proceso"
         NOTEBOOKS=("Ingest_circuits_data" "Ingest_racing_data" "Transform" "Load" "Preparacion_Ambiente")  # Agrega más según necesitesas
+        NOTEBOOKS=("ntbk_1" "ntbk_2")  # Agrega más según necesitesas
         mkdir -p notebooks_to_deploy
         for nb in "${NOTEBOOKS[@]}"; do
           echo "Exportando $nb en modo raw..."
@@ -82,34 +82,6 @@ jobs:
         else
           echo "No se encontró workflow existente con nombre: $WORKFLOW_NAME"
         fi
-        
-    - name: Get existing cluster ID
-      run: |
-        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
-        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        CLUSTER_NAME="cluster_SD"
-        
-        echo "Buscando cluster existente: $CLUSTER_NAME"
-        
-        # Obtener lista de clusters
-        clusters_response=$(curl -s -X GET \
-          -H "Authorization: Bearer $DEST_TOKEN" \
-          "$DEST_HOST/api/2.0/clusters/list")
-        
-        echo "Clusters response: $clusters_response"
-        
-        # Extraer cluster_id del cluster especificado
-        cluster_id=$(echo "$clusters_response" | jq -r --arg name "$CLUSTER_NAME" '.clusters[]? | select(.cluster_name == $name) | .cluster_id')
-        
-        if [ "$cluster_id" != "" ] && [ "$cluster_id" != "null" ]; then
-          echo "✅ Cluster encontrado: $CLUSTER_NAME con ID: $cluster_id"
-          echo "CLUSTER_ID=$cluster_id" >> $GITHUB_ENV
-        else
-          echo "❌ No se encontró el cluster: $CLUSTER_NAME"
-          echo "Clusters disponibles:"
-          echo "$clusters_response" | jq -r '.clusters[]? | .cluster_name'
-          exit 1
-        fi
     
     - name: Create Databricks Workflow WF_ADB
       run: |
@@ -132,7 +104,7 @@ jobs:
                 "notebook_path": "/py/scripts/main/Preparacion_Ambiente",
                 "source": "WORKSPACE"
               },
-              "existing_cluster_id": "$CLUSTER_ID",
+              "job_cluster_key": "serverless_cluster",
               "timeout_seconds": 3600,
               "max_retries": 2
             },
@@ -143,7 +115,7 @@ jobs:
                 "notebook_path": "/py/scripts/main/Ingest_circuits_data",
                 "source": "WORKSPACE"
               },
-              "existing_cluster_id": "$CLUSTER_ID",
+              "job_cluster_key": "serverless_cluster",
               "timeout_seconds": 3600,
               "max_retries": 2,
               "depends_on": [
@@ -159,7 +131,7 @@ jobs:
                 "notebook_path": "/py/scripts/main/Ingest_racing_data",
                 "source": "WORKSPACE"
               },
-              "existing_cluster_id": "$CLUSTER_ID",
+              "job_cluster_key": "serverless_cluster",
               "timeout_seconds": 3600,
               "max_retries": 2,
               "depends_on": [
@@ -175,7 +147,7 @@ jobs:
                 "notebook_path": "/py/scripts/main/Transform",
                 "source": "WORKSPACE"
               },
-              "existing_cluster_id": "$CLUSTER_ID",
+              "job_cluster_key": "serverless_cluster",
               "timeout_seconds": 3600,
               "max_retries": 2,
               "depends_on": [
@@ -194,7 +166,7 @@ jobs:
                 "notebook_path": "/py/scripts/main/Load",
                 "source": "WORKSPACE"
               },
-              "existing_cluster_id": "$CLUSTER_ID",
+              "job_cluster_key": "serverless_cluster",
               "timeout_seconds": 3600,
               "max_retries": 2,
               "depends_on": [
@@ -217,12 +189,8 @@ jobs:
                 "custom_tags": {
                   "environment": "production",
                   "team": "data-engineering"
-                },
-                "spark_conf": {
-                  "spark.databricks.cluster.profile": "serverless",
-                  "spark.databricks.repl.allowedLanguages": "python,sql"
                 }
-              }
+            }
             }
           ],
           "schedule": {
